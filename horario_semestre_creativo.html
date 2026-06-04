@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Horario — Semestre Creativo</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,500;1,9..144,300&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #f5f2ed;
+    --surface: #ffffff;
+    --border: #e0dbd3;
+    --text: #1a1714;
+    --muted: #8c877f;
+    --accent: #c9502a;
+    --slot-h: 52px;
+    --col-w: 130px;
+    --time-w: 58px;
+    --colors: #c9502a, #3b6e8f, #5a8a4a, #8b5a9e, #c97820, #2e7d6e, #b03060;
+  }
+
+  body {
+    font-family: 'DM Mono', monospace;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 2rem;
+  }
+
+  header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+
+  .logo {
+    font-family: 'Fraunces', serif;
+    font-size: 1.6rem;
+    font-weight: 300;
+    letter-spacing: -0.01em;
+  }
+  .logo span { color: var(--accent); font-style: italic; }
+
+  .header-actions { display: flex; gap: .6rem; align-items: center; }
+
+  .btn {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    padding: 7px 14px;
+    border-radius: 4px;
+    border: 1.5px solid var(--text);
+    background: transparent;
+    color: var(--text);
+    cursor: pointer;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    transition: all .15s;
+  }
+  .btn:hover { background: var(--text); color: var(--bg); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.primary:hover { background: #a83e20; border-color: #a83e20; }
+
+  .schedule-wrap {
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    overflow: auto;
+  }
+
+  .schedule-grid {
+    display: grid;
+    grid-template-columns: var(--time-w) repeat(6, var(--col-w));
+    min-width: calc(var(--time-w) + var(--col-w) * 6);
+    position: relative;
+  }
+
+  /* Header row */
+  .day-header {
+    padding: 14px 10px 12px;
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    border-bottom: 1.5px solid var(--border);
+    position: sticky;
+    top: 0;
+    background: var(--surface);
+    z-index: 10;
+  }
+  .day-header.today { color: var(--accent); }
+  .day-header:not(:first-child) { border-left: 1px solid var(--border); }
+  .day-header.corner { background: var(--bg); }
+
+  /* Time slots */
+  .time-label {
+    padding: 0 10px;
+    height: var(--slot-h);
+    display: flex;
+    align-items: flex-start;
+    padding-top: 8px;
+    font-size: 10px;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    left: 0;
+    background: var(--bg);
+    z-index: 5;
+  }
+
+  .slot {
+    height: var(--slot-h);
+    border-bottom: 1px solid #ede9e2;
+    border-left: 1px solid #ede9e2;
+    position: relative;
+    cursor: pointer;
+    transition: background .1s;
+  }
+  .slot:hover { background: #faf7f3; }
+  .slot.half { border-bottom-style: dashed; border-bottom-color: #ece7df; }
+
+  /* Class blocks */
+  .class-block {
+    position: absolute;
+    left: 3px;
+    right: 3px;
+    border-radius: 4px;
+    padding: 5px 7px;
+    z-index: 3;
+    cursor: pointer;
+    overflow: hidden;
+    transition: opacity .15s, transform .15s;
+    border-left: 3px solid rgba(0,0,0,.2);
+  }
+  .class-block:hover { opacity: .92; transform: scale(1.01); }
+  .class-block .cb-name {
+    font-size: 11px;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: #fff;
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+  }
+  .class-block .cb-time {
+    font-size: 9.5px;
+    color: rgba(255,255,255,.8);
+    margin-top: 1px;
+    font-family: 'DM Mono', monospace;
+  }
+  .class-block .cb-delete {
+    position: absolute;
+    top: 4px; right: 5px;
+    font-size: 13px;
+    color: rgba(255,255,255,.6);
+    cursor: pointer;
+    line-height: 1;
+    display: none;
+  }
+  .class-block:hover .cb-delete { display: block; }
+  .class-block .cb-delete:hover { color: #fff; }
+
+  /* Modal */
+  .modal-backdrop {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(26,23,20,.4);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+  }
+  .modal-backdrop.open { display: flex; }
+
+  .modal {
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    padding: 2rem;
+    width: 340px;
+    max-width: 95vw;
+  }
+  .modal h2 {
+    font-family: 'Fraunces', serif;
+    font-weight: 300;
+    font-size: 1.2rem;
+    margin-bottom: 1.4rem;
+  }
+
+  .field { margin-bottom: 1rem; }
+  .field label {
+    display: block;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--muted);
+    margin-bottom: 5px;
+  }
+  .field input, .field select {
+    width: 100%;
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    padding: 8px 10px;
+    border: 1.5px solid var(--border);
+    border-radius: 4px;
+    background: var(--bg);
+    color: var(--text);
+    outline: none;
+    transition: border-color .15s;
+  }
+  .field input:focus, .field select:focus { border-color: var(--accent); }
+
+  .color-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .color-dot {
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: transform .1s;
+  }
+  .color-dot:hover { transform: scale(1.15); }
+  .color-dot.selected { border-color: var(--text); }
+
+  .modal-actions { display: flex; gap: .5rem; justify-content: flex-end; margin-top: 1.5rem; }
+
+  .legend {
+    display: flex; flex-wrap: wrap; gap: .6rem;
+    margin-top: 1.2rem;
+  }
+  .legend-item {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 11px; color: var(--muted);
+  }
+  .legend-dot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+
+  .empty-hint {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: var(--muted);
+    font-size: 12px;
+    display: none;
+  }
+  .empty-hint p { margin-bottom: .5rem; }
+
+  @media (max-width: 600px) {
+    body { padding: .75rem; }
+    :root { --col-w: 90px; --time-w: 48px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Semestre <span>Creativo</span></div>
+  <div class="header-actions">
+    <button class="btn" onclick="exportPNG()">Exportar PNG</button>
+    <button class="btn primary" onclick="openAddModal()">+ Agregar materia</button>
+  </div>
+</header>
+
+<div class="schedule-wrap" id="scheduleWrap">
+  <div class="schedule-grid" id="grid">
+    <!-- Built by JS -->
+  </div>
+</div>
+
+<div class="legend" id="legend"></div>
+
+<!-- Modal -->
+<div class="modal-backdrop" id="modalBackdrop">
+  <div class="modal">
+    <h2 id="modalTitle">Nueva materia</h2>
+    <div class="field">
+      <label>Nombre de la materia</label>
+      <input type="text" id="fName" placeholder="Ej. Taller de Diseño III">
+    </div>
+    <div class="field">
+      <label>Maestro (opcional)</label>
+      <input type="text" id="fMaestro" placeholder="Ej. Arq. García">
+    </div>
+    <div style="display:flex; gap:1rem;">
+      <div class="field" style="flex:1">
+        <label>Hora inicio</label>
+        <select id="fStart"></select>
+      </div>
+      <div class="field" style="flex:1">
+        <label>Hora fin</label>
+        <select id="fEnd"></select>
+      </div>
+    </div>
+    <div class="field">
+      <label>Días</label>
+      <div style="display:flex; gap:6px; flex-wrap:wrap;" id="dayCheckboxes"></div>
+    </div>
+    <div class="field">
+      <label>Color</label>
+      <div class="color-row" id="colorRow"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal()">Cancelar</button>
+      <button class="btn primary" onclick="saveClass()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const DAYS = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+const HOURS_START = 7;
+const HOURS_END = 21;
+const COLORS = ['#c9502a','#3b6e8f','#5a8a4a','#8b5a9e','#c97820','#2e7d6e','#b03060','#5a6e2e','#2e5a8e'];
+const SLOT_H = 52;
+
+let classes = JSON.parse(localStorage.getItem('sc_classes') || '[]');
+let editingId = null;
+let selectedColor = COLORS[0];
+let selectedDays = [];
+
+function timeToRow(h, m) { return (h - HOURS_START) * 2 + (m >= 30 ? 1 : 0); }
+function rowToY(row) { return row * (SLOT_H / 2); }
+
+function buildGrid() {
+  const grid = document.getElementById('grid');
+  grid.innerHTML = '';
+
+  // Corner
+  const corner = document.createElement('div');
+  corner.className = 'day-header corner';
+  grid.appendChild(corner);
+
+  // Day headers
+  const today = new Date().getDay();
+  const dayMap = [null,'Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+  DAYS.forEach(d => {
+    const h = document.createElement('div');
+    h.className = 'day-header' + (dayMap[today] === d ? ' today' : '');
+    h.textContent = d;
+    grid.appendChild(h);
+  });
+
+  // Time rows
+  for (let h = HOURS_START; h < HOURS_END; h++) {
+    for (let half = 0; half < 2; half++) {
+      const tl = document.createElement('div');
+      tl.className = 'time-label';
+      if (half === 0) tl.textContent = h + ':00';
+      grid.appendChild(tl);
+
+      DAYS.forEach((d, di) => {
+        const slot = document.createElement('div');
+        const row = (h - HOURS_START) * 2 + half;
+        slot.className = 'slot' + (half === 1 ? ' half' : '');
+        slot.dataset.day = di;
+        slot.dataset.row = row;
+        slot.addEventListener('click', () => openAddModal(di, h + (half ? .5 : 0)));
+        grid.appendChild(slot);
+      });
+    }
+  }
+
+  renderClasses();
+}
+
+function renderClasses() {
+  document.querySelectorAll('.class-block').forEach(e => e.remove());
+  const grid = document.getElementById('grid');
+  const colStart = 1; // CSS grid col offset
+
+  classes.forEach(cls => {
+    const [sh, sm] = cls.start.split(':').map(Number);
+    const [eh, em] = cls.end.split(':').map(Number);
+    const startRow = timeToRow(sh, sm);
+    const endRow = timeToRow(eh, em);
+    const heightPx = (endRow - startRow) * (SLOT_H / 2);
+    const topPx = rowToY(startRow);
+
+    cls.days.forEach(di => {
+      const colSlots = grid.querySelectorAll(`.slot[data-day="${di}"]`);
+      if (!colSlots.length) return;
+      const firstSlot = colSlots[0];
+      const parentRect = grid.getBoundingClientRect();
+      const slotRect = firstSlot.getBoundingClientRect();
+
+      const block = document.createElement('div');
+      block.className = 'class-block';
+      block.style.backgroundColor = cls.color;
+      block.style.top = (topPx + 1) + 'px';
+      block.style.height = (heightPx - 2) + 'px';
+
+      // Position: find the correct column slot and use absolute within grid
+      const refSlot = grid.querySelector(`.slot[data-day="${di}"][data-row="${startRow}"]`);
+      if (!refSlot) return;
+
+      block.innerHTML = `
+        <div class="cb-name">${cls.name}</div>
+        ${cls.maestro ? `<div class="cb-time">${cls.maestro}</div>` : ''}
+        <div class="cb-time">${cls.start}–${cls.end}</div>
+        <span class="cb-delete" onclick="deleteClass('${cls.id}',event)">×</span>
+      `;
+      block.addEventListener('click', (e) => { if (!e.target.classList.contains('cb-delete')) editClass(cls.id); });
+
+      refSlot.style.position = 'relative';
+      refSlot.appendChild(block);
+    });
+  });
+
+  updateLegend();
+}
+
+function updateLegend() {
+  const legend = document.getElementById('legend');
+  legend.innerHTML = '';
+  classes.forEach(cls => {
+    const item = document.createElement('div');
+    item.className = 'legend-item';
+    item.innerHTML = `<div class="legend-dot" style="background:${cls.color}"></div>${cls.name}`;
+    legend.appendChild(item);
+  });
+}
+
+// Modal
+function buildModalControls() {
+  // Time selects
+  const fStart = document.getElementById('fStart');
+  const fEnd = document.getElementById('fEnd');
+  fStart.innerHTML = ''; fEnd.innerHTML = '';
+  for (let h = HOURS_START; h < HOURS_END; h++) {
+    for (let m of [0, 30]) {
+      const val = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+      fStart.innerHTML += `<option value="${val}">${val}</option>`;
+      fEnd.innerHTML += `<option value="${val}">${val}</option>`;
+    }
+  }
+  fEnd.value = '09:00';
+
+  // Day checkboxes
+  const dc = document.getElementById('dayCheckboxes');
+  dc.innerHTML = '';
+  DAYS.forEach((d, i) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn';
+    btn.textContent = d.slice(0,3);
+    btn.dataset.di = i;
+    btn.style.padding = '5px 10px';
+    btn.style.fontSize = '10px';
+    btn.addEventListener('click', () => {
+      if (selectedDays.includes(i)) {
+        selectedDays = selectedDays.filter(x => x !== i);
+        btn.style.background = '';
+        btn.style.color = '';
+      } else {
+        selectedDays.push(i);
+        btn.style.background = 'var(--text)';
+        btn.style.color = 'var(--bg)';
+      }
+    });
+    dc.appendChild(btn);
+  });
+
+  // Colors
+  const cr = document.getElementById('colorRow');
+  cr.innerHTML = '';
+  COLORS.forEach(c => {
+    const dot = document.createElement('div');
+    dot.className = 'color-dot' + (c === selectedColor ? ' selected' : '');
+    dot.style.background = c;
+    dot.addEventListener('click', () => {
+      selectedColor = c;
+      document.querySelectorAll('.color-dot').forEach(d => d.classList.remove('selected'));
+      dot.classList.add('selected');
+    });
+    cr.appendChild(dot);
+  });
+}
+
+function openAddModal(dayIndex, hour) {
+  editingId = null;
+  selectedDays = dayIndex !== undefined ? [dayIndex] : [];
+  selectedColor = COLORS[classes.length % COLORS.length];
+  document.getElementById('modalTitle').textContent = 'Nueva materia';
+  document.getElementById('fName').value = '';
+  document.getElementById('fMaestro').value = '';
+  buildModalControls();
+  if (hour !== undefined) {
+    const h = Math.floor(hour);
+    const m = (hour % 1) ? 30 : 0;
+    document.getElementById('fStart').value = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+    const endH = hour + 1.5;
+    const eh = Math.floor(endH);
+    const em = (endH % 1) ? 30 : 0;
+    document.getElementById('fEnd').value = `${String(eh).padStart(2,'0')}:${String(em).padStart(2,'0')}`;
+  }
+  if (dayIndex !== undefined) {
+    setTimeout(() => {
+      const btns = document.querySelectorAll('#dayCheckboxes button');
+      if (btns[dayIndex]) {
+        btns[dayIndex].style.background = 'var(--text)';
+        btns[dayIndex].style.color = 'var(--bg)';
+      }
+    }, 10);
+  }
+  document.getElementById('modalBackdrop').classList.add('open');
+  document.getElementById('fName').focus();
+}
+
+function editClass(id) {
+  const cls = classes.find(c => c.id === id);
+  if (!cls) return;
+  editingId = id;
+  selectedDays = [...cls.days];
+  selectedColor = cls.color;
+  document.getElementById('modalTitle').textContent = 'Editar materia';
+  buildModalControls();
+  document.getElementById('fName').value = cls.name;
+  document.getElementById('fMaestro').value = cls.maestro || '';
+  document.getElementById('fStart').value = cls.start;
+  document.getElementById('fEnd').value = cls.end;
+  setTimeout(() => {
+    cls.days.forEach(di => {
+      const btns = document.querySelectorAll('#dayCheckboxes button');
+      if (btns[di]) { btns[di].style.background = 'var(--text)'; btns[di].style.color = 'var(--bg)'; }
+    });
+    document.querySelectorAll('.color-dot').forEach(d => {
+      d.classList.toggle('selected', d.style.background === cls.color || d.style.backgroundColor === cls.color);
+    });
+  }, 10);
+  document.getElementById('modalBackdrop').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('modalBackdrop').classList.remove('open');
+}
+
+function saveClass() {
+  const name = document.getElementById('fName').value.trim();
+  const maestro = document.getElementById('fMaestro').value.trim();
+  const start = document.getElementById('fStart').value;
+  const end = document.getElementById('fEnd').value;
+  if (!name || selectedDays.length === 0 || start >= end) {
+    alert('Completa nombre, días y horario válido.');
+    return;
+  }
+  if (editingId) {
+    const idx = classes.findIndex(c => c.id === editingId);
+    classes[idx] = { ...classes[idx], name, maestro, start, end, days: [...selectedDays], color: selectedColor };
+  } else {
+    classes.push({ id: Date.now().toString(), name, maestro, start, end, days: [...selectedDays], color: selectedColor });
+  }
+  save();
+  closeModal();
+  buildGrid();
+}
+
+function deleteClass(id, e) {
+  e.stopPropagation();
+  if (confirm('¿Eliminar esta materia del horario?')) {
+    classes = classes.filter(c => c.id !== id);
+    save();
+    buildGrid();
+  }
+}
+
+function save() { localStorage.setItem('sc_classes', JSON.stringify(classes)); }
+
+function exportPNG() {
+  alert('Para exportar: toma una captura de pantalla del horario. En Chrome: Ctrl+Shift+P → "Capture screenshot".');
+}
+
+document.getElementById('modalBackdrop').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeModal();
+});
+
+buildGrid();
+</script>
+</body>
+</html>
